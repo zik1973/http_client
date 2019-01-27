@@ -1,11 +1,10 @@
 #include <assert.h>
 #include <string.h>
 #include <stdlib.h>
-//#include <sys/types.h>
-//#include <sys/socket.h>
 #include <netdb.h>
 #include <unistd.h>
 #include "http.h"
+#include "log.h"
 #include "url.h"
 
 struct http_request {
@@ -16,6 +15,7 @@ struct http_request {
 
 static int url_connect(struct url *url, int *sock)
 {
+	assert(url->host && url->host_len);
 	char *host = strndup(url->host, url->host_len);
 
 	struct addrinfo hints = {
@@ -25,6 +25,7 @@ static int url_connect(struct url *url, int *sock)
 	};
 
 	struct addrinfo *addrinfo = NULL;
+	// TODO: Add HTTPS support
 	int err = getaddrinfo(host, "http", &hints, &addrinfo);
 	if (err)
 		return err;
@@ -39,6 +40,10 @@ int http_get(const char *url, const char **headers, struct http_response *respon
 	int err = url_parse(url, &parsed);
 	if (err)
 		return err;
+	if (parsed.host_len == 0) {
+		error("Could not connect to the url: '%s'. Host is empty.", url);
+		return ERR_HTTP_URL_HAS_NO_HOST;
+	}
 	int sock = -1;
 	if ((err = url_connect(&parsed, &sock)))
 		return err;
