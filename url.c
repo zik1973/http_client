@@ -218,10 +218,4 @@ void test_url_parse(void)
 	test_default();
 	test_no_path();
 }
-
-int main(void)
-{
-	test_url_parse();
-	return 0;
-}
 #endif
