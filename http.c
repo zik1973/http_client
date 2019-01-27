@@ -1,8 +1,11 @@
 #include <assert.h>
+#include <errno.h>
+#include <netdb.h>
+#include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <strings.h>
-#include <stdlib.h>
-#include <netdb.h>
+#include <sys/socket.h>
 #include <unistd.h>
 #include "http.h"
 #include "log.h"
@@ -25,6 +28,7 @@ static int url_connect(struct url *url, int *sock)
 
 	struct addrinfo hints = {
 		.ai_flags = AI_ALL | AI_ADDRCONFIG,
+		//.ai_flags = AI_ALL,
 		.ai_family = AF_UNSPEC, /* support both IPv4 and IPv6 */
 		.ai_socktype = SOCK_STREAM
 	};
@@ -34,6 +38,22 @@ static int url_connect(struct url *url, int *sock)
 	free(host);
 	if (err)
 		return err;
+
+	for (struct addrinfo *cur = addrinfo; cur != NULL; cur = cur->ai_next) {
+		int s = socket(cur->ai_family, cur->ai_socktype, cur->ai_protocol);
+		if (s == -1) {
+			error("socket() failed: %s, err=%d", strerror(errno), errno);
+			continue;
+		}
+		if (connect(s, cur->ai_addr, cur->ai_addrlen)) {
+			error("connect() failed: %s, err=%d", strerror(errno), errno);
+			close(s);
+			continue;
+		}
+		info("connect successfull");
+		*sock = s;
+		break;
+	}
 
 	freeaddrinfo(addrinfo);
 	return err;
@@ -72,7 +92,8 @@ static void test_strndup(void)
 
 static void test_default(void)
 {
-	static const char url[] = "http://en.wikipedia.org/wiki/URL#Syntax";
+	//static const char url[] = "http://en.wikipedia.org/wiki/URL#Syntax";
+	static const char url[] = "http://yandex.ru";
 	struct http_response response;
 	int err = http_get(url, NULL, &response);
 	assert(!err);

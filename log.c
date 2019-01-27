@@ -10,3 +10,12 @@ void error(const char *format, ...)
 	fprintf(stderr, "\n");
 	va_end(ap);
 }
+
+void info(const char *format, ...)
+{
+	va_list ap;
+	va_start(ap, format);
+	vfprintf(stderr, format, ap);
+	fprintf(stderr, "\n");
+	va_end(ap);
+}
