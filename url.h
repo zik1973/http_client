@@ -6,6 +6,9 @@
 
 	URI = scheme:[//authority]path[?query][#fragment]
 	authority = [userinfo@]host[:port]
+
+	TODO: Add internationalzed URL support
+		  https://en.wikipedia.org/wiki/URL#Internationalized_URL
 */
 
 struct url {
