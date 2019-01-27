@@ -1,5 +1,6 @@
 #include <assert.h>
 #include <ctype.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -62,7 +63,7 @@ static int parse_port(const char *str, size_t len, struct url *url)
 	for (const char *ch = str; port_len < len && isdigit(*ch); port_len++, ch++)
 		;
 	if (port_len < len) {
-		fprintf(stderr, "Invalid port value: '%*.s'", len, str);
+		fprintf(stderr, "Invalid port value: '%.*s'", (unsigned int)len, str);
 		return ERR_URL_INVALID_PORT;
 	}
 	url->port = str;
@@ -91,7 +92,7 @@ static const char *parse_path(const char **str, size_t *path_len)
 	const char *hash = strchr(start, '#');
 	*path_len = hash ? hash - start : strlen(start);
 	*str = start + *path_len;
-	return start;
+	return *path_len ? start : NULL;
 }
 
 int url_parse(const char *url, struct url *parsed)
@@ -106,37 +107,116 @@ int url_parse(const char *url, struct url *parsed)
 }
 
 #ifdef UNIT_TEST
+static bool name_eq_null(const char *name, size_t name_len)
+{
+	if (name == NULL) {
+		if (name_len == 0)
+			return true;
+		fprintf(stderr, "name == NULL && name_len != 0: name_len=%u\n",
+				(unsigned int)name_len);
+		return false;
+	}
+	fprintf(stderr, "name != NULL: name='%.*s'\n",
+			(unsigned int)name_len, name);
+	return false;
+}
+
+static bool name_eq(const char *name, size_t name_len, const char *value)
+{
+	if (value == NULL)
+		return name_eq_null(name, name_len);
+
+	size_t value_len = strlen(value);
+	if (name_len != value_len) {
+		fprintf(stderr, "name_len != value_len: name_len=%u, value_len=%u\n",
+				(unsigned int)name_len, (unsigned int)value_len);
+		return false;
+	}
+	if (strncmp(name, value, name_len)) {
+		fprintf(stderr, "name != value: name='%.*s', value='%s'\n",
+				(unsigned int)name_len, name, value);
+		return false;
+	}
+	return true;
+}
+
 static void	test_default()
 {
 	struct url parsed;
 	assert(!url_parse("http://en.wikipedia.org/wiki/URL#Syntax", &parsed));
 
-	assert(parsed.scheme_len == 4);
-	assert(!memcmp(parsed.scheme, "http", 4));
+	assert(name_eq(parsed.scheme, parsed.scheme_len, "http"));
+	assert(name_eq(parsed.username, parsed.username_len, NULL));
+	assert(name_eq(parsed.password, parsed.password_len, NULL));
+	assert(name_eq(parsed.host, parsed.host_len, "en.wikipedia.org"));
+	assert(name_eq(parsed.port, parsed.port_len, NULL));
+	assert(name_eq(parsed.path, parsed.path_len, "/wiki/URL"));
+}
 
-	assert(parsed.username == NULL);
-	assert(parsed.username_len == 0);
+static void	test_scheme_host()
+{
+	struct url parsed;
+	assert(!url_parse("http://en.wikipedia.org", &parsed));
 
-	assert(parsed.password == NULL);
-	assert(parsed.password_len == 0);
+	assert(name_eq(parsed.scheme, parsed.scheme_len, "http"));
+	assert(name_eq(parsed.username, parsed.username_len, NULL));
+	assert(name_eq(parsed.password, parsed.password_len, NULL));
+	assert(name_eq(parsed.host, parsed.host_len, "en.wikipedia.org"));
+	assert(name_eq(parsed.port, parsed.port_len, NULL));
+	assert(name_eq(parsed.path, parsed.path_len, NULL));
+}
 
-	static const char host[] = "en.wikipedia.org";
-	size_t host_len = strlen(host);
-	assert(parsed.host_len == host_len);
-	assert(!memcmp(parsed.host, host, host_len));
+static void	test_scheme_host_port()
+{
+	struct url parsed;
+	assert(!url_parse("http://en.wikipedia.org:8080", &parsed));
 
-	assert(parsed.port == NULL);
-	assert(parsed.port_len == 0);
+	assert(name_eq(parsed.scheme, parsed.scheme_len, "http"));
+	assert(name_eq(parsed.username, parsed.username_len, NULL));
+	assert(name_eq(parsed.password, parsed.password_len, NULL));
+	assert(name_eq(parsed.host, parsed.host_len, "en.wikipedia.org"));
+	assert(name_eq(parsed.port, parsed.port_len, "8080"));
+	assert(name_eq(parsed.path, parsed.path_len, NULL));
+}
 
-	static const char path[] = "/wiki/URL";
-	size_t path_len = strlen(path);
-	assert(parsed.path_len == path_len);
-	assert(!memcmp(parsed.path, path, path_len));
+static void	test_scheme_host_empty_port()
+{
+	struct url parsed;
+	assert(!url_parse("http://en.wikipedia.org:", &parsed));
+
+	assert(name_eq(parsed.scheme, parsed.scheme_len, "http"));
+	assert(name_eq(parsed.username, parsed.username_len, NULL));
+	assert(name_eq(parsed.password, parsed.password_len, NULL));
+	assert(name_eq(parsed.host, parsed.host_len, "en.wikipedia.org"));
+	assert(name_eq(parsed.port, parsed.port_len, NULL));
+	assert(name_eq(parsed.path, parsed.path_len, NULL));
+}
+
+static void	test_scheme_host_non_numeric_port()
+{
+	struct url parsed;
+	assert(url_parse("http://en.wikipedia.org:port", &parsed) == ERR_URL_INVALID_PORT);
+
+	assert(name_eq(parsed.scheme, parsed.scheme_len, "http"));
+	assert(name_eq(parsed.username, parsed.username_len, NULL));
+	assert(name_eq(parsed.password, parsed.password_len, NULL));
+	assert(name_eq(parsed.host, parsed.host_len, "en.wikipedia.org"));
+	assert(name_eq(parsed.port, parsed.port_len, NULL));
+	assert(name_eq(parsed.path, parsed.path_len, NULL));
+}
+
+static void	test_no_path()
+{
+	test_scheme_host();
+	test_scheme_host_port();
+	test_scheme_host_empty_port();
+	test_scheme_host_non_numeric_port();
 }
 
 void test_url_parse()
 {
 	test_default();
+	test_no_path();
 }
 
 int main()
