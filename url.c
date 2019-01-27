@@ -7,18 +7,16 @@
 #include "log.h"
 #include "url.h"
 
-static const char *parse_scheme(const char **str, size_t *scheme_len)
+static int parse_scheme(const char **str, struct url *url)
 {
 	const char *start = *str;
-	*scheme_len = 0;
 	const char *colon = strchr(start, ':');
 	if (colon == NULL)
-		return NULL;
-	if (strncmp(colon, "://", 3))
-		return NULL;
-	*scheme_len = colon - start;
-	*str = colon + 3;
-	return start;
+		return ERR_URL_NO_SCHEME;
+	url->scheme = start;
+	url->scheme_len = colon - start;
+	*str = colon + 1;
+	return 0;
 }
 
 static void parse_userinfo(const char **str, size_t *len, struct url *url)
@@ -75,13 +73,17 @@ static int parse_port(const char *str, size_t len, struct url *url)
 static int parse_authority(const char **str, struct url *parsed)
 {
 	const char *start = *str;
+	/* if authority exists it starts from //, otherwise authority is empty */
+	if (strncmp(start, "//", 2))
+		return 0;
+	start += 2;
 	const char *slash = strchr(start, '/');
 	size_t len = slash ? (slash - start) : strlen(start);
 	const char *end = start + len;
 
-	parse_userinfo(str, &len, parsed);
-	parsed->host = parse_host(str, &len, &parsed->host_len);
-	int err = parse_port(*str, len, parsed);
+	parse_userinfo(&start, &len, parsed);
+	parsed->host = parse_host(&start, &len, &parsed->host_len);
+	int err = parse_port(start, len, parsed);
 	*str = end;
 	return err;
 }
@@ -99,9 +101,10 @@ static const char *parse_path(const char **str, size_t *path_len)
 int url_parse(const char *url, struct url *parsed)
 {
 	memset(parsed, 0, sizeof(*parsed));
-	parsed->scheme = parse_scheme(&url, &parsed->scheme_len);
-	int err = parse_authority(&url, parsed);
+	int err = parse_scheme(&url, parsed);
 	if (err)
+		return err;
+	if ((err = parse_authority(&url, parsed)))
 		return err;
 	parsed->path = parse_path(&url, &parsed->path_len);
 	return 0;
@@ -162,7 +165,7 @@ static void test_scheme_host(void)
 	assert(name_eq(parsed.password, parsed.password_len, NULL));
 	assert(name_eq(parsed.host, parsed.host_len, "en.wikipedia.org"));
 	assert(name_eq(parsed.port, parsed.port_len, NULL));
-	assert(name_eq(parsed.path, parsed.path_len, NULL));
+	assert(name_eq(parsed.path, parsed.path_len, ""));
 }
 
 static void test_scheme_host_port(void)
@@ -175,7 +178,7 @@ static void test_scheme_host_port(void)
 	assert(name_eq(parsed.password, parsed.password_len, NULL));
 	assert(name_eq(parsed.host, parsed.host_len, "en.wikipedia.org"));
 	assert(name_eq(parsed.port, parsed.port_len, "8080"));
-	assert(name_eq(parsed.path, parsed.path_len, NULL));
+	assert(name_eq(parsed.path, parsed.path_len, ""));
 }
 
 static void test_scheme_host_empty_port(void)
@@ -188,7 +191,7 @@ static void test_scheme_host_empty_port(void)
 	assert(name_eq(parsed.password, parsed.password_len, NULL));
 	assert(name_eq(parsed.host, parsed.host_len, "en.wikipedia.org"));
 	assert(name_eq(parsed.port, parsed.port_len, NULL));
-	assert(name_eq(parsed.path, parsed.path_len, NULL));
+	assert(name_eq(parsed.path, parsed.path_len, ""));
 }
 
 static void test_scheme_host_non_numeric_port(void)
@@ -201,20 +204,13 @@ static void test_scheme_host_non_numeric_port(void)
 	assert(name_eq(parsed.password, parsed.password_len, NULL));
 	assert(name_eq(parsed.host, parsed.host_len, "en.wikipedia.org"));
 	assert(name_eq(parsed.port, parsed.port_len, NULL));
-	assert(name_eq(parsed.path, parsed.path_len, NULL));
+	assert(name_eq(parsed.path, parsed.path_len, ""));
 }
 
 static void test_no_scheme_host(void)
 {
 	struct url parsed;
-	assert(!url_parse("en.wikipedia.org", &parsed));
-
-	assert(name_eq(parsed.scheme, parsed.scheme_len, NULL));
-	assert(name_eq(parsed.username, parsed.username_len, NULL));
-	assert(name_eq(parsed.password, parsed.password_len, NULL));
-	assert(name_eq(parsed.host, parsed.host_len, "en.wikipedia.org"));
-	assert(name_eq(parsed.port, parsed.port_len, NULL));
-	assert(name_eq(parsed.path, parsed.path_len, NULL));
+	assert(url_parse("en.wikipedia.org", &parsed) == ERR_URL_NO_SCHEME);
 }
 
 static void test_no_path(void)
@@ -229,14 +225,7 @@ static void test_no_path(void)
 static void test_no_scheme_no_host_path(void)
 {
 	struct url parsed;
-	assert(!url_parse("/wiki/URL#Syntax", &parsed));
-
-	assert(name_eq(parsed.scheme, parsed.scheme_len, "http"));
-	assert(name_eq(parsed.username, parsed.username_len, NULL));
-	assert(name_eq(parsed.password, parsed.password_len, NULL));
-	assert(name_eq(parsed.host, parsed.host_len, "en.wikipedia.org"));
-	assert(name_eq(parsed.port, parsed.port_len, NULL));
-	assert(name_eq(parsed.path, parsed.path_len, "/wiki/URL"));
+	assert(url_parse("/wiki/URL#Syntax", &parsed) == ERR_URL_NO_SCHEME);
 }
 
 void test_url_parse(void)

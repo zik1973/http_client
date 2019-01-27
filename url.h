@@ -26,7 +26,8 @@ struct url {
 	size_t path_len;
 };
 
-#define ERR_URL_INVALID_PORT	-1
+#define ERR_URL_NO_SCHEME		-1
+#define ERR_URL_INVALID_PORT	-2
 
 int url_parse(const char *url,  struct url *parsed);
 
