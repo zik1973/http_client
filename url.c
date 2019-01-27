@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "log.h"
 #include "url.h"
 
 static const char *parse_scheme(const char **str, size_t *scheme_len)
@@ -63,7 +64,7 @@ static int parse_port(const char *str, size_t len, struct url *url)
 	for (const char *ch = str; port_len < len && isdigit(*ch); port_len++, ch++)
 		;
 	if (port_len < len) {
-		fprintf(stderr, "Invalid port value: '%.*s'", (unsigned int)len, str);
+		error("Invalid port value: '%.*s'", (unsigned int)len, str);
 		return ERR_URL_INVALID_PORT;
 	}
 	url->port = str;
@@ -112,12 +113,10 @@ static bool name_eq_null(const char *name, size_t name_len)
 	if (name == NULL) {
 		if (name_len == 0)
 			return true;
-		fprintf(stderr, "name == NULL && name_len != 0: name_len=%u\n",
-				(unsigned int)name_len);
+		error("name == NULL && name_len != 0: name_len=%u", (unsigned int)name_len);
 		return false;
 	}
-	fprintf(stderr, "name != NULL: name='%.*s'\n",
-			(unsigned int)name_len, name);
+	error("name != NULL: name='%.*s'", (unsigned int)name_len, name);
 	return false;
 }
 
@@ -128,12 +127,12 @@ static bool name_eq(const char *name, size_t name_len, const char *value)
 
 	size_t value_len = strlen(value);
 	if (name_len != value_len) {
-		fprintf(stderr, "name_len != value_len: name_len=%u, value_len=%u\n",
+		error("name_len != value_len: name_len=%u, value_len=%u",
 				(unsigned int)name_len, (unsigned int)value_len);
 		return false;
 	}
 	if (strncmp(name, value, name_len)) {
-		fprintf(stderr, "name != value: name='%.*s', value='%s'\n",
+		error("name != value: name='%.*s', value='%s'",
 				(unsigned int)name_len, name, value);
 		return false;
 	}

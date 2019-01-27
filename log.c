@@ -2,7 +2,7 @@
 #include <stdio.h>
 #include "log.h"
 
-void err(const char *format, ...)
+void error(const char *format, ...)
 {
 	va_list ap;
 	va_start(ap, format);
