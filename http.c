@@ -1,5 +1,6 @@
 #include <assert.h>
 #include <string.h>
+#include <strings.h>
 #include <stdlib.h>
 #include <netdb.h>
 #include <unistd.h>
@@ -18,6 +19,10 @@ static int url_connect(struct url *url, int *sock)
 	assert(url->host && url->host_len);
 	char *host = strndup(url->host, url->host_len);
 
+	/* TODO: Add HTTPS support */
+	assert(url->scheme_len == 4);
+	assert(!strncasecmp(url->scheme, "http", 4));
+
 	struct addrinfo hints = {
 		.ai_flags = AI_ALL | AI_ADDRCONFIG,
 		.ai_family = AF_UNSPEC, /* support both IPv4 and IPv6 */
@@ -25,8 +30,8 @@ static int url_connect(struct url *url, int *sock)
 	};
 
 	struct addrinfo *addrinfo = NULL;
-	// TODO: Add HTTPS support
 	int err = getaddrinfo(host, "http", &hints, &addrinfo);
+	free(host);
 	if (err)
 		return err;
 
