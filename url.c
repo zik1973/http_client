@@ -140,7 +140,7 @@ static bool name_eq(const char *name, size_t name_len, const char *value)
 	return true;
 }
 
-static void	test_default()
+static void test_default(void)
 {
 	struct url parsed;
 	assert(!url_parse("http://en.wikipedia.org/wiki/URL#Syntax", &parsed));
@@ -153,7 +153,7 @@ static void	test_default()
 	assert(name_eq(parsed.path, parsed.path_len, "/wiki/URL"));
 }
 
-static void	test_scheme_host()
+static void test_scheme_host(void)
 {
 	struct url parsed;
 	assert(!url_parse("http://en.wikipedia.org", &parsed));
@@ -166,7 +166,7 @@ static void	test_scheme_host()
 	assert(name_eq(parsed.path, parsed.path_len, NULL));
 }
 
-static void	test_scheme_host_port()
+static void test_scheme_host_port(void)
 {
 	struct url parsed;
 	assert(!url_parse("http://en.wikipedia.org:8080", &parsed));
@@ -179,7 +179,7 @@ static void	test_scheme_host_port()
 	assert(name_eq(parsed.path, parsed.path_len, NULL));
 }
 
-static void	test_scheme_host_empty_port()
+static void test_scheme_host_empty_port(void)
 {
 	struct url parsed;
 	assert(!url_parse("http://en.wikipedia.org:", &parsed));
@@ -192,7 +192,7 @@ static void	test_scheme_host_empty_port()
 	assert(name_eq(parsed.path, parsed.path_len, NULL));
 }
 
-static void	test_scheme_host_non_numeric_port()
+static void test_scheme_host_non_numeric_port(void)
 {
 	struct url parsed;
 	assert(url_parse("http://en.wikipedia.org:port", &parsed) == ERR_URL_INVALID_PORT);
@@ -205,7 +205,7 @@ static void	test_scheme_host_non_numeric_port()
 	assert(name_eq(parsed.path, parsed.path_len, NULL));
 }
 
-static void	test_no_path()
+static void test_no_path(void)
 {
 	test_scheme_host();
 	test_scheme_host_port();
@@ -213,13 +213,13 @@ static void	test_no_path()
 	test_scheme_host_non_numeric_port();
 }
 
-void test_url_parse()
+void test_url_parse(void)
 {
 	test_default();
 	test_no_path();
 }
 
-int main()
+int main(void)
 {
 	test_url_parse();
 	return 0;
