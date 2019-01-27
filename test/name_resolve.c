@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <stdlib.h>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netdb.h>
@@ -41,20 +42,23 @@ static const char *get_protocol_name(int protocol)
 
 int main()
 {
-	static const char host[] = "en.wikipedia.org";
-	//static const char host[] = "yandex.ru";
+	//static const char host[] = "en.wikipedia.org";
+	static const char host[] = "yandex.ru";
 	struct addrinfo hints = {
-		.ai_flags = AI_CANONNAME,
+		.ai_flags = AI_CANONNAME | AI_ALL | AI_ADDRCONFIG,
+		//.ai_flags = AI_CANONNAME | AI_ALL,
 		.ai_family = AF_UNSPEC,
 		.ai_socktype = SOCK_STREAM
 	};
 	struct addrinfo *addrinfo = NULL;
 	//int err = getaddrinfo(host, "80", &hints, &addrinfo);
-	//int err = getaddrinfo(host, "http", &hints, &addrinfo);
-	int err = getaddrinfo(host, "https", &hints, &addrinfo);
+	int err = getaddrinfo(host, "http", &hints, &addrinfo);
+	//int err = getaddrinfo(host, "https", &hints, &addrinfo);
+	//int err = getaddrinfo(host, NULL, &hints, &addrinfo);
+	//int err = getaddrinfo(host, "81", &hints, &addrinfo);
 	if (err) {
-		fprintf(stderr, "getaddrinfo() failed: err=%d", err);
-		return 1;
+		fprintf(stderr, "getaddrinfo() failed: %s err=%d", gai_strerror(err), err);
+		return EXIT_FAILURE;
 	}
 
 	for (struct addrinfo *cur = addrinfo; cur != NULL; cur = cur->ai_next) {
@@ -65,6 +69,15 @@ int main()
 		printf("addrlen=%u\n", cur->ai_addrlen);
 		printf("addr.family=%u\n", (unsigned int)cur->ai_addr->sa_family);
 		printf("canonname='%s'\n", cur->ai_canonname);
+
+		char hbuf[1025], sbuf[32];
+		err = getnameinfo(cur->ai_addr, cur->ai_addrlen, hbuf, sizeof(hbuf), 
+							sbuf, sizeof(sbuf), NI_NUMERICHOST);
+		if (err) {
+			fprintf(stderr, "getnameinfo() failed: %s err=%d", gai_strerror(err), err);
+			return EXIT_FAILURE;
+		}
+		printf("host='%s', service='%s'\n", hbuf, sbuf);
 	}
 
 	freeaddrinfo(addrinfo);
