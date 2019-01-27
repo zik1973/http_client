@@ -52,8 +52,8 @@ int main()
 	};
 	struct addrinfo *addrinfo = NULL;
 	//int err = getaddrinfo(host, "80", &hints, &addrinfo);
-	int err = getaddrinfo(host, "http", &hints, &addrinfo);
-	//int err = getaddrinfo(host, "https", &hints, &addrinfo);
+	//int err = getaddrinfo(host, "http", &hints, &addrinfo);
+	int err = getaddrinfo(host, "https", &hints, &addrinfo);
 	//int err = getaddrinfo(host, NULL, &hints, &addrinfo);
 	//int err = getaddrinfo(host, "81", &hints, &addrinfo);
 	if (err) {
