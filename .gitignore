@@ -1,3 +1,4 @@
 build.sh
 http_client
+test/a.out
 *.o
