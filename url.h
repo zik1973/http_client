@@ -17,7 +17,8 @@ struct url {
 	size_t password_len;
 	const char *host;
 	size_t host_len;
-	unsigned short int port;
+	const char *port;
+	size_t port_len;
 	const char *path;
 	size_t path_len;
 };

@@ -1,4 +1,5 @@
 #include <assert.h>
+#include <ctype.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -53,25 +54,19 @@ static const char *parse_host(const char **str, size_t *len, size_t *host_len)
 	return start;
 }
 
-static int parse_port(const char *str, size_t len, unsigned short int *port)
+static int parse_port(const char *str, size_t len, struct url *url)
 {
 	if (len == 0)
 		return 0;
-	char *end = NULL;
-	long lport = strtol(str, &end, 10);
-	if (str + len != end) {
+	size_t port_len = 0;
+	for (const char *ch = str; port_len < len && isdigit(*ch); port_len++, ch++)
+		;
+	if (port_len < len) {
 		fprintf(stderr, "Invalid port value: '%*.s'", len, str);
 		return ERR_URL_INVALID_PORT;
 	}
-	if (lport < 0) {
-		fprintf(stderr, "Negative port value is invalid: %ld", lport);
-		return ERR_URL_INVALID_PORT;
-	}
-	if (lport > 0xFFFF) {
-		fprintf(stderr, "Port value could not be more than %ld, specified: %ld", 0xFFFFUL, lport);
-		return ERR_URL_INVALID_PORT;
-	}
-	*port = (unsigned short int)lport;
+	url->port = str;
+	url->port_len = port_len;
 	return 0;
 }
 
@@ -84,7 +79,7 @@ static int parse_authority(const char **str, struct url *parsed)
 
 	parse_userinfo(str, &len, parsed);
 	parsed->host = parse_host(str, &len, &parsed->host_len);
-	int err = parse_port(*str, len, &parsed->port);
+	int err = parse_port(*str, len, parsed);
 	*str = end;
 	return err;
 }
@@ -130,7 +125,8 @@ static void	test_default()
 	assert(parsed.host_len == host_len);
 	assert(!memcmp(parsed.host, host, host_len));
 
-	assert(parsed.port == 0);
+	assert(parsed.port == NULL);
+	assert(parsed.port_len == 0);
 
 	static const char path[] = "/wiki/URL";
 	size_t path_len = strlen(path);
