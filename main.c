@@ -3,7 +3,7 @@
 #ifdef UNIT_TEST
 int main()
 {
-	//test_url_parse();
+	test_url_parse();
 	test_http();
 	return 0;
 }

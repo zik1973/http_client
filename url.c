@@ -204,17 +204,45 @@ static void test_scheme_host_non_numeric_port(void)
 	assert(name_eq(parsed.path, parsed.path_len, NULL));
 }
 
+static void test_no_scheme_host(void)
+{
+	struct url parsed;
+	assert(!url_parse("en.wikipedia.org", &parsed));
+
+	assert(name_eq(parsed.scheme, parsed.scheme_len, NULL));
+	assert(name_eq(parsed.username, parsed.username_len, NULL));
+	assert(name_eq(parsed.password, parsed.password_len, NULL));
+	assert(name_eq(parsed.host, parsed.host_len, "en.wikipedia.org"));
+	assert(name_eq(parsed.port, parsed.port_len, NULL));
+	assert(name_eq(parsed.path, parsed.path_len, NULL));
+}
+
 static void test_no_path(void)
 {
 	test_scheme_host();
 	test_scheme_host_port();
 	test_scheme_host_empty_port();
 	test_scheme_host_non_numeric_port();
+	test_no_scheme_host();
+}
+
+static void test_no_scheme_no_host_path(void)
+{
+	struct url parsed;
+	assert(!url_parse("/wiki/URL#Syntax", &parsed));
+
+	assert(name_eq(parsed.scheme, parsed.scheme_len, "http"));
+	assert(name_eq(parsed.username, parsed.username_len, NULL));
+	assert(name_eq(parsed.password, parsed.password_len, NULL));
+	assert(name_eq(parsed.host, parsed.host_len, "en.wikipedia.org"));
+	assert(name_eq(parsed.port, parsed.port_len, NULL));
+	assert(name_eq(parsed.path, parsed.path_len, "/wiki/URL"));
 }
 
 void test_url_parse(void)
 {
 	test_default();
 	test_no_path();
+	test_no_scheme_no_host_path();
 }
 #endif
