@@ -204,6 +204,45 @@ static void http_response_init(struct http_response *response)
 {
 	memset(response, 0, sizeof(*response));
 	response->socket = -1;
+	response->buf_size = 1 << 20;
+}
+
+static int do_recv(struct http_response *response)
+{
+	assert(response->data_size == 0);
+	response->data = NULL;
+	ssize_t result = recv(response->socket, response->buf, response->buf_size, 0);
+	if (result < 0) {
+		response->recv_errno = errno;
+		error("recv() failed: %s errno=%d", strerror(response->recv_errno), response->recv_errno);
+		return ERR_HTTP_RECV_FAILED;
+	}
+	assert(result < response->buf_size);
+	response->data_size = result;
+	response->data = response->buf;
+	return 0;
+}
+
+int http_response_read(struct http_response *response, void *buf, size_t buf_len, size_t *data_size)
+{
+	char *dest = buf;
+	size_t received = 0;
+	int err = 0;
+	while (received < buf_len) {
+		if (response->data == response->buf + response->buf_size && (err = do_recv(response)))
+			break;
+		if (response->data_size == 0)
+			break;
+		size_t remainder = buf_len - received;
+		size_t block_size = remainder < response->data_size ? remainder : response->data_size;
+		memcpy(dest, response->data, block_size);
+		dest += block_size;
+		received += block_size;
+		response->data += block_size;
+		response->data_size -= block_size;
+	}
+	*data_size = received;
+	return err;
 }
 
 void http_response_close(struct http_response *response)
@@ -212,6 +251,15 @@ void http_response_close(struct http_response *response)
 		close(response->socket);
 		response->socket = -1;
 	}
+
+	free(response->header_buf);
+	response->header_buf = NULL;
+	response->status_line = NULL;
+	response->headers = NULL;
+
+	free(response->buf);
+	response->data = response->buf = NULL;
+	response->data_size = response->buf_size = 0;
 }
 
 static void http_printf(struct buffer *buf, const char *format, ...)
@@ -261,23 +309,146 @@ static int http_send(struct http_request *request)
 	return err;
 }
 
+static int parse_status_line(struct http_response *response, const char *first_line, const char **next)
+{
+	char *eol = strstr(first_line, "\r\n");
+	if (eol) {
+		*eol = 0;
+		*next = eol + 2;
+	}
+
+	/* Skip HTTP version */
+	char *space = strchr(first_line, ' ');
+	if (space == NULL) {
+		error("Invalid status line: '%s'", first_line);
+		return ERR_HTTP_INVALID_RESPONSE;
+	}
+	*space = 0;
+	response->status_line = space + 1;
+
+	unsigned int http_major = 0;
+	unsigned int http_minor = 0;
+	if (2 != sscanf(first_line, "HTTP/%u.%u", &http_major, &http_minor)) {
+		error("Invalid HTTP version: '%s'", first_line);
+		return ERR_HTTP_INVALID_RESPONSE;
+	}
+	response->http_version_major = http_major;
+	response->http_version_minor = http_minor;
+
+	if (1 != sscanf(response->status_line, "%u", &response->status_code)) {
+		error("Invalid status code: Status line: '%s'", response->status_line);
+		return ERR_HTTP_INVALID_RESPONSE;
+	}
+
+	return 0;
+}
+
+static size_t count_headers(const char *response_header)
+{
+	size_t nr_headers = 0;
+	const char *line = response_header;
+	while (1) {
+		char *eol = strstr(line, "\r\n");
+		if (eol == NULL)
+			return nr_headers;
+		nr_headers++;
+		line = eol + 2;
+	}
+}
+
+static void remove_trailing_space(const char *header, char *eol)
+{
+	while (eol > header) {
+		eol--;
+		if (!isspace(*eol))
+			break;
+		*eol = 0;
+	}
+}
+
+static int parse_headers(struct http_response *response, const char *headers, size_t nr_headers)
+{
+	if (headers == NULL) {
+		assert(nr_headers == 0);
+		response->headers[0] = NULL;
+		return 0;
+	}
+
+	size_t i = 0;
+	const char *header = headers;
+	while (1) {
+		response->headers[i++] = header;
+		char *eol = strstr(header, "\r\n");
+		if (eol == NULL) {
+			remove_trailing_space(header, (char*)header + strlen(header));
+			break;
+		}
+		*eol = 0;
+
+		/* Remove optional trailing whitespace according to
+		   https://tools.ietf.org/html/rfc7230#section-3.2 */
+		remove_trailing_space(header, eol);
+
+		header = eol + 2;
+	}
+	assert(i == nr_headers);
+	response->headers[i] = NULL;
+	return 0;
+}
+
+static const char *memstr(const char *mem, size_t size, const char *str)
+{
+	while (1) {
+		const char *ptr = memchr(mem, *str, size);
+		if (ptr == NULL)
+			return NULL;
+		size_t str_size = strlen(str);
+		if (mem + size < ptr + str_size)
+			return NULL;
+		if (!memcmp(ptr, str, str_size))
+			return ptr;
+		mem = ptr + 1;
+	}
+}
+
+static int parse_header(struct http_response *response)
+{
+	const char *empty_line = memstr(response->data, response->data_size, "\r\n\r\n");
+	if (empty_line == NULL)
+		return ERR_HTTP_BUFFER_TOO_SMALL; /* too many HTTP headers */
+
+	size_t header_size = empty_line - response->data;
+	response->data[header_size] = 0;
+
+	size_t nr_headers = count_headers(response->data);
+
+	response->header_buf = malloc((nr_headers + 1) * sizeof(char*) + header_size + 1);
+	response->headers = (const char**)response->header_buf;
+	memset(response->headers, 0, (nr_headers + 1) * sizeof(char*));
+
+	char *header = response->header_buf + (nr_headers + 1) * sizeof(char*);
+	memcpy(header, response->data, header_size);
+	header[header_size] = 0;
+	response->data += header_size + 4;
+
+	const char *headers = NULL;
+	int err = parse_status_line(response, header, &headers);
+	if (err)
+		return err;
+
+	return parse_headers(response, headers, nr_headers);
+}
+
 static int http_recv(struct http_response *response)
 {
 	assert(response->socket != -1);
-	size_t bsize = 1 << 20;
-	char *buf = malloc(bsize);
-	int err = 0;
-	ssize_t read = recv(response->socket, buf, bsize, 0);
-	if (read == -1) {
-		error("recv() failed: %s errno=%d", strerror(errno), errno);
-		err = ERR_HTTP_RECV_FAILED;
-		goto out;
-	}
-	fprintf(stderr, "%.*s\n", (int)read, buf);
-
-out:
-	free(buf);
-	return err;
+	assert(response->buf == NULL);
+	assert(response->buf_size > 0);
+	response->buf = malloc(response->buf_size);
+	int err = do_recv(response);
+	if (err)
+		return err;
+	return parse_header(response);
 }
 
 /* Performs HTTP request-response transaction */
