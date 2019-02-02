@@ -351,25 +351,37 @@ static void test_aprintf(void)
 	free(str);
 }
 
+static void test_tools(void)
+{
+	test_strndup();
+	test_free();
+	test_aprintf();
+}
+
 static void test_http_headers(void)
 {
 }
 
-static void test_default(void)
+static void test_one(const char *url)
 {
-	//static const char url[] = "http://en.wikipedia.org/wiki/URL#Syntax";
-	static const char url[] = "http://yandex.ru/";
 	struct http_response response;
 	int err = http_get(url, NULL, &response);
 	assert(!err);
 	http_response_close(&response);
 }
 
+static void test_default(void)
+{
+	test_one("http://xn----dtbofgvdd5ah.xn--p1ai/4950985197/");
+	return;
+	test_one("http://кто-звонит.рф/4950985197/");
+	test_one("http://en.wikipedia.org/wiki/URL#Syntax");
+	test_one("http://yandex.ru/");
+}
+
 void test_http(void)
 {
-	test_strndup();
-	test_free();
-	test_aprintf();
+	test_tools();
 	test_http_headers();
 	test_default();
 }
