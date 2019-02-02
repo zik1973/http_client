@@ -33,6 +33,15 @@ static int url_connect(struct url *url, int *sock)
 
 	struct addrinfo *addrinfo = NULL;
 	int err = getaddrinfo(host, "http", &hints, &addrinfo);
+	/*
+	if (err == EAI_NODATA) {
+		err = punycode(&host);
+		assert(!err);
+		err = getaddrinfo(host, "http", &hints, &addrinfo);
+	}
+	*/
+	if (err)
+		error("getaddrinfo(host='%s') failed: %s err=%d", host, gai_strerror(err), err);
 	free(host);
 	if (err)
 		return err;

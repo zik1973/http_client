@@ -6,6 +6,7 @@ SRCS = \
  http.c \
  log.c \
  main.c \
+ punycode.c \
  url.c
 
 OBJS = $(SRCS:.c=.o)
