@@ -372,8 +372,9 @@ static void test_one(const char *url)
 
 static void test_default(void)
 {
-	test_one("http://xn----dtbofgvdd5ah.xn--p1ai/4950985197/");
+	test_one("http://web-control.ru/");
 	return;
+	test_one("http://xn----dtbofgvdd5ah.xn--p1ai/4950985197/");
 	test_one("http://кто-звонит.рф/4950985197/");
 	test_one("http://en.wikipedia.org/wiki/URL#Syntax");
 	test_one("http://yandex.ru/");
