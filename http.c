@@ -349,8 +349,12 @@ static size_t count_headers(const char *response_header)
 	const char *line = response_header;
 	while (1) {
 		char *eol = strstr(line, "\r\n");
-		if (eol == NULL)
+		if (eol == NULL) {
+			/* Last header must not be empty.
+			   The caller must terminate last header with the '\0' character */
+			assert(*line);
 			return nr_headers;
+		}
 		nr_headers++;
 		line = eol + 2;
 	}
@@ -529,8 +533,27 @@ static void test_tools(void)
 	test_aprintf();
 }
 
+static void test_count_headers(void)
+{
+	static const char response_header1[] = 
+		"HTTP/1.1 200 OK";
+	assert(0 == count_headers(response_header1));
+
+	static const char response_header2[] = 
+		"HTTP/1.1 200 OK\r\n"
+		"Server: nginx";
+	assert(1 == count_headers(response_header2));
+
+	static const char response_header3[] = 
+		"HTTP/1.1 200 OK\r\n"
+		"Server: nginx\r\n"
+		"Date: Sun, 03 Feb 2019 09:35:44 GMT";
+	assert(2 == count_headers(response_header3));
+}
+
 static void test_http_headers(void)
 {
+	test_count_headers();
 }
 
 static void test_one(const char *url)
