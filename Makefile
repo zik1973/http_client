@@ -4,6 +4,7 @@ CFLAGS = -std=c99 -pedantic -Wall -Werror -D_POSIX_C_SOURCE=200809L -DUNIT_TEST
 SRCS = \
  buffer.c \
  http.c \
+ http_download.c \
  log.c \
  main.c \
  punycode.c \

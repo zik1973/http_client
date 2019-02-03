@@ -4,7 +4,8 @@
 int main()
 {
 	//test_url_parse();
-	test_http();
+	//test_http();
+	test_http_download();
 	return 0;
 }
 #else

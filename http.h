@@ -35,6 +35,9 @@ void http_response_close(struct http_response *response);
 int http_get(const char *url, const char **headers, struct http_response *response);
 int http_post(const char *url, const char **headers, const char *body, struct http_response *response);
 
+int http_download(const char *url, const char *output_file);
+
 #ifdef UNIT_TEST
+void test_http_download(void);
 void test_http(void);
 #endif
