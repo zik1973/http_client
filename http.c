@@ -583,10 +583,45 @@ static void test_parse_status_line(void)
 	assert(ERR_HTTP_INVALID_RESPONSE == test_parse_status_line_one("HTTP/xx 200 OK", 0, 0));
 }
 
+static void test_parse_header_default(void)
+{
+	static const char response_header[] = 
+		"HTTP/1.1 200 OK\r\n"
+		"Server: nginx\r\n"
+		"Date: Sun, 03 Feb 2019 09:35:44 GMT\r\n"
+		"Header-With-Trailing-Whitespace: \tsome value \t\r\n"
+		"\r\n"
+		"blah blah blah";
+	struct http_response response;
+	http_response_init(&response);
+
+	response.buf = strdup(response_header);
+	response.data = response.buf;
+	response.data_size = strlen(response_header);
+	assert(!parse_header(&response));
+
+	assert(response.http_version_major == 1);
+	assert(response.http_version_minor == 1);
+	assert(response.status_code == 200);
+	assert(!strcmp(response.status_line, "200 OK"));
+	assert(!strcmp(response.headers[0], "Server: nginx"));
+	assert(!strcmp(response.headers[1], "Date: Sun, 03 Feb 2019 09:35:44 GMT"));
+	assert(!strcmp(response.headers[2], "Header-With-Trailing-Whitespace: \tsome value"));
+	assert(response.headers[3] == NULL);
+
+	http_response_close(&response);
+}
+
+static void test_parse_header(void)
+{
+	test_parse_header_default();
+}
+
 static void test_http_headers(void)
 {
 	test_count_headers();
 	test_parse_status_line();
+	test_parse_header();
 }
 
 static void test_one(const char *url)
