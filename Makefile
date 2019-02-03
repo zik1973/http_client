@@ -1,5 +1,5 @@
 CC = cc
-CFLAGS = -std=c99 -pedantic -Wall -D_POSIX_C_SOURCE=200809L -DUNIT_TEST
+CFLAGS = -std=c99 -pedantic -Wall -Werror -D_POSIX_C_SOURCE=200809L -DUNIT_TEST
 
 SRCS = \
  http.c \
