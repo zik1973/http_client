@@ -23,6 +23,8 @@ struct http_response {
 /* Returns value of the HTTP header if found. Otherwise returns NULL. */
 const char *http_response_get_header(struct http_response *response, const char *name);
 
+int http_response_readline(struct http_response *response, const char **line);
+
 int http_response_read(struct http_response *response, void *buf, size_t buf_len, size_t *data_size);
 
 void http_response_close(struct http_response *response);

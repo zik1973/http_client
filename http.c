@@ -209,16 +209,21 @@ static void http_response_init(struct http_response *response)
 
 static int do_recv(struct http_response *response)
 {
-	assert(response->data_size == 0);
-	response->data = NULL;
-	ssize_t result = recv(response->socket, response->buf, response->buf_size, 0);
+	size_t data_size = response->data_size;
+	if (data_size) {
+		memmove(response->buf, response->data, data_size);
+		response->data = response->buf;
+	} else {
+		response->data = NULL;
+	}
+	ssize_t result = recv(response->socket, response->buf + data_size, response->buf_size - data_size, 0);
 	if (result < 0) {
 		response->recv_errno = errno;
 		error("recv() failed: %s errno=%d", strerror(response->recv_errno), response->recv_errno);
 		return ERR_HTTP_RECV_FAILED;
 	}
-	assert(result <= response->buf_size);
-	response->data_size = result;
+	assert(result <= response->buf_size - data_size);
+	response->data_size += result;
 	response->data = response->buf;
 	return 0;
 }
@@ -233,6 +238,45 @@ const char *http_response_get_header(struct http_response *response, const char 
 			return value;
 	}
 	return NULL;
+}
+
+static char *memstr(const char *mem, size_t size, const char *str)
+{
+	while (1) {
+		char *ptr = memchr(mem, *str, size);
+		if (ptr == NULL)
+			return NULL;
+		size_t str_size = strlen(str);
+		if (mem + size < ptr + str_size)
+			return NULL;
+		if (!memcmp(ptr, str, str_size))
+			return ptr;
+		mem = ptr + 1;
+	}
+}
+
+int http_response_readline(struct http_response *response, const char **line)
+{
+	for (int attempt = 1; ; attempt++) {
+		char *eol = memstr(response->data, response->data_size, "\r\n");
+		if (eol) {
+			*eol = 0;
+			char *prev_data = response->data;
+			response->data = eol + 2;
+			response->data_size -= response->data - prev_data; 
+			*line = prev_data;
+			return 0;
+		}
+
+		if (attempt == 2) {
+			error("http_response_readline() failed: Could not find CRLF in %u bytes", response->data_size);
+			return ERR_HTTP_INVALID_RESPONSE;
+		}
+
+		int err = do_recv(response);
+		if (err)
+			return err;
+	}
 }
 
 int http_response_read(struct http_response *response, void *buf, size_t buf_len, size_t *data_size)
@@ -412,21 +456,6 @@ static int parse_headers(struct http_response *response, const char *headers, si
 	return 0;
 }
 
-static const char *memstr(const char *mem, size_t size, const char *str)
-{
-	while (1) {
-		const char *ptr = memchr(mem, *str, size);
-		if (ptr == NULL)
-			return NULL;
-		size_t str_size = strlen(str);
-		if (mem + size < ptr + str_size)
-			return NULL;
-		if (!memcmp(ptr, str, str_size))
-			return ptr;
-		mem = ptr + 1;
-	}
-}
-
 static int parse_header(struct http_response *response)
 {
 	const char *empty_line = memstr(response->data, response->data_size, "\r\n\r\n");
@@ -461,6 +490,7 @@ static int http_recv(struct http_response *response)
 	assert(response->buf == NULL);
 	assert(response->buf_size > 0);
 	response->buf = malloc(response->buf_size);
+	assert(response->data_size == 0);
 	int err = do_recv(response);
 	if (err)
 		return err;
