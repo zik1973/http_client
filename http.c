@@ -279,6 +279,32 @@ int http_response_readline(struct http_response *response, const char **line)
 	}
 }
 
+static inline size_t xdigit_to_number(char xdigit)
+{
+	if (xdigit <= '9')
+		return xdigit - '0';
+	if (isupper(xdigit))
+		return xdigit - 'A' + 10;
+	return xdigit - 'a' + 10;
+}
+
+int http_response_get_chunk_size(struct http_response *response, size_t *chunk_size)
+{
+	const char *chunk_header = NULL;
+	int err = http_response_readline(response, &chunk_header);
+	if (err)
+		return err;
+
+	size_t size = 0;
+	for (const char *ch = chunk_header; isxdigit(*ch); ch++)
+		size = (size << 4) | xdigit_to_number(*ch);  
+
+	/* Ignoring chunk extensions. See https://tools.ietf.org/html/rfc7230#section-4 */
+
+	*chunk_size = size;
+	return 0;
+}
+
 int http_response_read(struct http_response *response, void *buf, size_t buf_len, size_t *data_size)
 {
 	char *dest = buf;
