@@ -309,7 +309,7 @@ static int http_send(struct http_request *request)
 	return err;
 }
 
-static int parse_status_line(struct http_response *response, const char *first_line, const char **next)
+static int parse_status_line(struct http_response *response, char *first_line, const char **next)
 {
 	char *eol = strstr(first_line, "\r\n");
 	if (eol) {
@@ -551,9 +551,42 @@ static void test_count_headers(void)
 	assert(2 == count_headers(response_header3));
 }
 
+static int test_parse_status_line_one(const char *first_line, int major_version, int minor_version)
+{
+	struct http_response response;
+	http_response_init(&response);
+
+	char *header = strdup(first_line);
+	const char *headers = NULL;
+	int err = parse_status_line(&response, header, &headers);
+	free(header);
+	if (!err) {
+		assert(response.http_version_major == major_version);
+		assert(response.http_version_minor == minor_version);
+	}
+	http_response_close(&response);
+	return err;
+}
+
+static void test_parse_status_line(void)
+{
+	assert(!test_parse_status_line_one("HTTP/1.1 200 OK", 1, 1));
+
+	static const char response_header2[] = 
+		"HTTP/1.1 200 OK\r\n"
+		"Server: nginx";
+	assert(!test_parse_status_line_one(response_header2, 1, 1));
+
+	assert(!test_parse_status_line_one("HTTP/0.9 200 OK", 0, 9));
+	assert(!test_parse_status_line_one("HTTP/1.0 200 OK", 1, 0));
+	assert(ERR_HTTP_INVALID_RESPONSE == test_parse_status_line_one("HTTP/2 200 OK", 2, 0));
+	assert(ERR_HTTP_INVALID_RESPONSE == test_parse_status_line_one("HTTP/xx 200 OK", 0, 0));
+}
+
 static void test_http_headers(void)
 {
 	test_count_headers();
+	test_parse_status_line();
 }
 
 static void test_one(const char *url)
