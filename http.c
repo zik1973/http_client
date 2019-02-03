@@ -245,6 +245,18 @@ int http_response_read(struct http_response *response, void *buf, size_t buf_len
 	return err;
 }
 
+const char *http_response_get_header(struct http_response *response, const char *name)
+{
+	size_t name_len = strlen(name);
+	const char **header = response->headers;
+	for (; *header; header++) {
+		const char *value = http_header_is(*header, name, name_len);
+		if (value)
+			return value;
+	}
+	return NULL;
+}
+
 void http_response_close(struct http_response *response)
 {
 	if (response->socket != -1) {
@@ -608,6 +620,11 @@ static void test_parse_header_default(void)
 	assert(!strcmp(response.headers[1], "Date: Sun, 03 Feb 2019 09:35:44 GMT"));
 	assert(!strcmp(response.headers[2], "Header-With-Trailing-Whitespace: \tsome value"));
 	assert(response.headers[3] == NULL);
+
+	assert(!strcmp(http_response_get_header(&response, "Server"), "nginx"));
+	assert(!strcmp(http_response_get_header(&response, "Date"), "Sun, 03 Feb 2019 09:35:44 GMT"));
+	assert(!strcmp(http_response_get_header(&response, "Header-With-Trailing-Whitespace"), "some value"));
+	assert(http_response_get_header(&response, "Unknown-header") == NULL);
 
 	http_response_close(&response);
 }
